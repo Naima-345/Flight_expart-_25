@@ -1,0 +1,93 @@
+# version: "3.1"
+
+# nlu:
+#   - intent: greet
+#     examples: |
+#       - hey
+#       - hello
+#       - hi
+#       - hello there
+#       - good morning
+
+#   - intent: book_flight
+#     examples: |
+#       - i want to book a flight ticket
+#       - I'd like to book a flight
+#       - book a plane ticket
+#       - I want to travel somewhere
+#       - find a flight for me
+#       - Can you help me with a flight booking?
+#       - I need to book a trip
+#       - let's book a flight
+#       - I'm looking for a plane ticket
+
+#   - intent: thank_you
+#     examples: |
+#       - Thank you so much
+#       - Thanks
+#       - Thanks a lot
+#       - Thank you
+#       - Much appreciated
+
+#   - intent: destination
+#     examples: |
+#       - I want to go to [Bangladesh](destination)
+#       - Book a ticket to [India](destination)
+#       - [Australia](destination)
+#       - My destination is [Canada](destination)
+#       - Fly me to [France](destination)
+#       - My destination is [Japan](destination)
+
+#   - intent: inform_date
+#     examples: |
+#       - on [5th September](inform_date)
+#       - [12 August](inform_date)
+#       - I will travel on [10 September](inform_date)
+#       - next Friday
+#       - tomorrow
+#       - 5th january
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+version: "3.1"
+
+nlu:
+- intent: greet
+  examples: |
+    - hello
+    - hi
+    - hey
+    - good morning
+    - good evening
+
+- intent: book_flight
+  examples: |
+    - I want to book a flight
+    - Can you help me book a ticket?
+    - I need to fly somewhere
+    - Book a flight for me
+    - Book a ticket 
+    - i need a flight ticket
+
+- intent: inform
+  examples: |
+    - My origin is [Bangladesh](origin)
+    - I want to fly from [Japan](origin)
+    - I want to go to [Bangladesh](destination)
+    - I want to fly to [Japan](destination)
+    - I will travel on [20th August](travel_date)
+    - Travel date is [20th August](travel_date)
+    - [20/11/2025](travel_date)
+
+

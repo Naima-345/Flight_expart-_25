@@ -1,0 +1,115 @@
+# version: "3.1"
+
+# intents:
+#   - greet
+#   - book_flight
+#   - destination
+#   - inform_date
+#   - thank_you
+
+# entities:
+#   - destination
+#   - inform_date
+
+# slots:
+#   destination:
+#     type: text
+#     influence_conversation: true
+#     mappings:
+#       - type: from_entity
+#         entity: destination
+
+#   inform_date:
+#     type: text
+#     influence_conversation: true
+#     mappings:
+#       - type: from_entity
+#         entity: inform_date
+
+# forms:
+#   flight_booking_form:
+#     required_slots:
+#       - destination
+#       - inform_date
+
+# responses:
+#   utter_greet:
+#     - text: "Hello! I'm your Flight Expert. How can I help you today?"
+
+#   utter_ask_destination:
+#     - text: "Please tell me your travel destination from our list of 10 countries."
+
+#   utter_ask_inform_date:
+#     - text: "When do you plan to travel?"
+
+#   utter_thank_you:
+#     - text: "Thank you for booking with us. Have a safe journey!"
+
+# actions:
+#   - flight_booking_form
+#   - action_confirm_booking
+
+session_config:
+  session_expiration_time: 60
+  carry_over_slots_to_new_session: true
+
+
+
+
+
+version: "3.1"
+
+
+
+intents:
+  - greet
+  - book_flight
+  - inform
+
+entities:
+  - origin
+  - destination
+  - travel_date
+
+slots:
+  origin:
+    type: text
+    mappings:
+      - type: from_entity
+        entity: origin
+
+  destination:
+    type: text
+    mappings:
+      - type: from_entity
+        entity: destination
+
+  travel_date:
+    type: text
+    mappings:
+      - type: from_entity
+        entity: travel_date
+
+forms:
+  flight_booking_form:
+    required_slots:
+      - origin
+      - destination
+      - travel_date
+
+responses:
+  utter_greet:
+    - text: "Hi, I am Flight Expert. How can I help you today?"
+
+  utter_ask_origin:
+    - text: "Please input your origin?"
+
+  utter_ask_destination:
+    - text: "Please provide the destination?"
+
+  utter_ask_travel_date:
+    - text: "When do you want to travel?"
+
+actions:
+  - action_submit_booking
+

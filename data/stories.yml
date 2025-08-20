@@ -1,0 +1,31 @@
+# version: "3.1"
+
+# stories:
+#   # The greeting is handled by a rule, so it's removed from here.
+
+#   - story: User books a flight with destination and date
+#     steps:
+#     # We remove the "greet" step from the story. The bot is already listening
+#     # after the greeting, so the story now starts with the user's intent to book.
+#     - intent: destination
+#     - action: action_validate_destination
+#     - action: utter_ask_inform_date
+#     - intent: inform_date
+#     - action: action_confirm_booking
+#     - action: utter_thank_you
+
+
+
+version: "3.1"
+
+stories:
+- story: flight booking path
+  steps:
+  - intent: greet
+  - action: utter_greet
+  - intent: book_flight
+  - action: flight_booking_form
+  - active_loop: flight_booking_form
+  - action: flight_booking_form
+  - active_loop: null
+  - action: action_submit_booking

@@ -1,0 +1,42 @@
+# version: "3.1"
+
+# rules:
+#   # ... (other rules)
+
+# - rule: Activate flight booking form
+#   steps:
+#   - intent: book_flight
+#   - action: flight_booking_form
+#   - active_loop: flight_booking_form
+
+
+version: "3.1"
+
+rules:
+- rule: Greet user
+  steps:
+    - intent: greet
+    - action: utter_greet
+
+- rule: Start flight booking form
+  steps:
+    - intent: book_flight
+    - action: flight_booking_form
+    - active_loop: flight_booking_form
+
+- rule: Submit flight booking
+  condition:
+    - active_loop: flight_booking_form
+  steps:
+    - action: flight_booking_form
+    - active_loop: null
+    - action: action_submit_booking
+
+
+- rule: Submit flight booking
+  condition:
+    - active_loop: flight_booking_form
+  steps:
+    - action: flight_booking_form
+    - active_loop: null
+    - action: action_book_flight  # ✅ Use the correct name here
