@@ -1,0 +1,35 @@
+
+*** These modified files were found in JOE when it aborted on Thu Aug 21 10:14:50 2025
+*** JOE was aborted by UNIX signal 1
+
+*** File '/home/ehz/flight expert/.git/MERGE_MSG'
+
+
+
+
+
+Merge branch 'main' of https://github.com/Naima-345/Flight_expart-_25
+# Please enter a commit message to explain why this merge is necessary,
+# especially if it merges an updated upstream into a topic branch.
+#
+# Lines starting with '#' will be ignored, and an empty message aborts
+# the commit.
+
+*** File '(Unnamed)'
+create_bengali_emotion_dataset.py
+create_bengali_emotion_dataset.py
+split.sh
+split.sh
+split.sh
+split.sh
+split.sh
+split.sh
+split.sh
+t.py
+/home/ehz/flight expert/.git/MERGE_MSG
+
+*** File '* Startup Log *'
+Processing '/etc/joe/editorrc'...
+Processing '/etc/joe/ftyperc'...
+Finished processing /etc/joe/ftyperc
+Finished processing /etc/joe/editorrc

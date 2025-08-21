@@ -1,94 +1,90 @@
-# version: "3.1"
-
-# intents:
-#   - greet
-#   - book_flight
-#   - destination
-#   - inform_date
-#   - thank_you
-
-# entities:
-#   - destination
-#   - inform_date
-
-# slots:
-#   destination:
-#     type: text
-#     influence_conversation: true
-#     mappings:
-#       - type: from_entity
-#         entity: destination
-
-#   inform_date:
-#     type: text
-#     influence_conversation: true
-#     mappings:
-#       - type: from_entity
-#         entity: inform_date
-
-# forms:
-#   flight_booking_form:
-#     required_slots:
-#       - destination
-#       - inform_date
-
-# responses:
-#   utter_greet:
-#     - text: "Hello! I'm your Flight Expert. How can I help you today?"
-
-#   utter_ask_destination:
-#     - text: "Please tell me your travel destination from our list of 10 countries."
-
-#   utter_ask_inform_date:
-#     - text: "When do you plan to travel?"
-
-#   utter_thank_you:
-#     - text: "Thank you for booking with us. Have a safe journey!"
-
-# actions:
-#   - flight_booking_form
-#   - action_confirm_booking
-
-session_config:
-  session_expiration_time: 60
-  carry_over_slots_to_new_session: true
-
-
-
-
-
 version: "3.1"
-
-
 
 intents:
   - greet
   - book_flight
-  - inform
-
+  - inform_origin
+  - inform_destination
+  - inform_travel_date
+  - inform_passenger_name
+  - inform_phone_number
+  - inform_seat_preference
+  - inform_class_selection
+  - inform_flight_time
 entities:
   - origin
   - destination
   - travel_date
+  - passenger_name
+  - phone_number
+  - seat_preference
+  - class_selection
+  - flight_time
 
 slots:
   origin:
     type: text
     mappings:
-      - type: from_entity
-        entity: origin
+      - type: from_text
+        conditions:
+          - active_loop: flight_booking_form
+            requested_slot: origin
 
   destination:
     type: text
     mappings:
-      - type: from_entity
-        entity: destination
+      - type: from_text
+        conditions:
+          - active_loop: flight_booking_form
+            requested_slot: destination
 
   travel_date:
     type: text
     mappings:
-      - type: from_entity
-        entity: travel_date
+      - type: from_text
+        conditions:
+          - active_loop: flight_booking_form
+            requested_slot: travel_date
+
+  passenger_name:
+    type: text
+    mappings:
+      - type: from_text
+        conditions:
+          - active_loop: flight_booking_form
+            requested_slot: passenger_name
+
+  phone_number:
+    type: text
+    mappings:
+      - type: from_text
+        conditions:
+          - active_loop: flight_booking_form
+            requested_slot: phone_number
+
+  seat_preference:
+    type: text
+    mappings:
+      - type: from_text
+        conditions:
+          - active_loop: flight_booking_form
+            requested_slot: seat_preference
+
+  class_selection:
+    type: text
+    mappings:
+      - type: from_text
+        conditions:
+          - active_loop: flight_booking_form
+            requested_slot: class_selection
+
+  flight_time:
+    type: text
+    mappings:
+      - type: from_text
+        conditions:
+          - active_loop: flight_booking_form
+            requested_slot: flight_time
 
 forms:
   flight_booking_form:
@@ -96,20 +92,45 @@ forms:
       - origin
       - destination
       - travel_date
+      - passenger_name
+      - phone_number
+      - seat_preference
+      - class_selection
+      - flight_time
 
 responses:
   utter_greet:
     - text: "Hi, I am Flight Expert. How can I help you today?"
 
   utter_ask_origin:
-    - text: "Please input your origin?"
+    - text: "Where are you traveling from?"
 
   utter_ask_destination:
-    - text: "Please provide the destination?"
+    - text: "Where are you traveling to?"
 
   utter_ask_travel_date:
-    - text: "When do you want to travel?"
+    - text: "Which date do you want to travel?"
+
+  utter_ask_passenger_name:
+    - text: "Please provide the passenger's name."
+
+  utter_ask_phone_number:
+    - text: "Please provide your phone number."
+
+  utter_ask_seat_preference:
+    - text: "Do you have a seat preference (window, aisle, middle)?"
+
+  utter_ask_class_selection:
+    - text: "Which class do you prefer (economy, business, first)?"
+
+  utter_ask_flight_time:
+    - text: "What time do you want to fly?"
 
 actions:
   - action_submit_booking
+  - action_book_flight
+  - validate_flight_booking_form
 
+session_config:
+  session_expiration_time: 60
+  carry_over_slots_to_new_session: true
