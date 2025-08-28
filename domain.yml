@@ -11,6 +11,7 @@ intents:
   - inform_seat_preference
   - inform_class_selection
   - inform_flight_time
+  - inform_travel_count
 entities:
   - origin
   - destination
@@ -20,7 +21,7 @@ entities:
   - seat_preference
   - class_selection
   - flight_time
-
+  - travel_count
 slots:
   origin:
     type: text
@@ -85,6 +86,13 @@ slots:
         conditions:
           - active_loop: flight_booking_form
             requested_slot: flight_time
+  travel_count:
+    type: text
+    mappings:
+      - type: from_text
+        conditions:
+          - active_loop: flight_booking_form
+            requested_slot: travel_count
 
 forms:
   flight_booking_form:
@@ -97,6 +105,7 @@ forms:
       - seat_preference
       - class_selection
       - flight_time
+      - travel_count
 
 responses:
   utter_greet:
@@ -125,6 +134,8 @@ responses:
 
   utter_ask_flight_time:
     - text: "What time do you want to fly?"
+  utter_ask_travel_count:
+    - text: "How many travelers are there?"
 
 actions:
   - action_submit_booking

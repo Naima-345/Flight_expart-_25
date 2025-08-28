@@ -96,3 +96,7 @@ nlu:
     - Flight time is 18:30
     - At 7 PM
     - afternoon flight
+- intent: inform_travel_count
+  examples: |
+    - 3 
+    - 2

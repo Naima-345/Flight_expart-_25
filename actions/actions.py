@@ -1,10 +1,13 @@
 from typing import Any, Text, Dict, List
+from aiogram import Dispatcher
 from rasa_sdk import Action, Tracker, FormValidationAction
 from rasa_sdk.executor import CollectingDispatcher
-from rasa_sdk.events import SlotSet
+from rasa_sdk.events import SlotSet, Restarted, FollowupAction
 import json
 import os
 import sqlite3
+from datetime import datetime
+import re
 # --- Load allowed countries from JSON file ---
 def load_allowed_countries() -> List[str]:
     """Load allowed countries from allowed_countries.json file."""
@@ -95,106 +98,80 @@ class ValidateFlightBookingForm(FormValidationAction):
     
 
     def validate_travel_date(self, value: Text, dispatcher: CollectingDispatcher, tracker: Tracker, domain: Dict[Text, Any]) -> Dict[Text, Any]:
-        if value.strip():
+        pattern = r"^\d{2}/\d{2}/\d{4}$"
+        if not re.match(pattern, value):
+            dispatcher.utter_message(text="❌ Please enter the date in DD/MM/YYYY format (e.g., 15/09/2025).")
+            return {"travel_date": None}
+        try:
+            datetime.strptime(value, "%d/%m/%Y")
             return {"travel_date": value}
-        dispatcher.utter_message(text="Please enter a valid travel date.")
-        return {"travel_date": None}
+        except ValueError:
+            dispatcher.utter_message(text="❌ Invalid date. Please check the day, month, and year.")
+            return {"travel_date": None}
 
     def validate_passenger_name(self, value: Text, dispatcher: CollectingDispatcher, tracker: Tracker, domain: Dict[Text, Any]) -> Dict[Text, Any]:
         if value.strip():
             return {"passenger_name": value}
         dispatcher.utter_message(text="Please enter the passenger's name.")
         return {"passenger_name": None}
+    def validate_travel_count(self, value: Text, dispatcher: CollectingDispatcher, tracker: Tracker, domain: Dict[Text, Any]) -> Dict[Text, Any]:
+        if value.strip().isdigit():
+            return {"travel_count": int(value)}
+        dispatcher.utter_message(text="Please enter a valid number of travelers.")
+        return {"travel_count": None}
 
 
 
-# --- Main action for submitting booking ---
 class ActionSubmitBooking(Action):
-    def name(self) -> Text:
+    def name(self) -> str:
         return "action_submit_booking"
 
-    def run(self, dispatcher: CollectingDispatcher,
-            tracker: Tracker,
-            domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
-        # Collect slot values
-        booking_data = {
-            "origin": tracker.get_slot("origin"),
-            "destination": tracker.get_slot("destination"),
-            "travel_date": tracker.get_slot("travel_date"),
-            "passenger_name": tracker.get_slot("passenger_name"),
-            "phone_number": tracker.get_slot("phone_number"),
-            "seat_preference": tracker.get_slot("seat_preference"),
-            "class_selection": tracker.get_slot("class_selection"),
-            "flight_time": tracker.get_slot("flight_time")
-        }
+    def run(self, dispatcher, tracker, domain):
+        origin = tracker.get_slot("origin") or "N/A"
+        destination = tracker.get_slot("destination") or "N/A"
+        travel_date = tracker.get_slot("travel_date") or "N/A"
+        flight_time = tracker.get_slot("flight_time") or "N/A"
+        seat = tracker.get_slot("seat_preference") or "N/A"
+        cls = tracker.get_slot("class_selection") or "N/A"
+        passenger_name = tracker.get_slot("passenger_name") or "N/A"
+        phone_number = tracker.get_slot("phone_number") or "N/A"
+        travel_count = tracker.get_slot("travel_count") or "N/A"
 
-        # Save to SQLite DB
-        conn = sqlite3.connect("rasa.db")
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS ticket_booking_details (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                origin TEXT,
-                destination TEXT,
-                travel_date TEXT,
-                passenger_name TEXT,
-                phone_number TEXT,
-                seat_preference TEXT,
-                class_selection TEXT,
-                flight_time TEXT
-            )
-        """)
-        cursor.execute("""
-            INSERT INTO ticket_booking_details (
-                origin, destination, travel_date, passenger_name, phone_number, seat_preference, class_selection, flight_time
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            booking_data["origin"], booking_data["destination"], booking_data["travel_date"],
-            booking_data["passenger_name"], booking_data["phone_number"], booking_data["seat_preference"],
-            booking_data["class_selection"], booking_data["flight_time"]
-        ))
-        conn.commit()
-        conn.close()
-
-        dispatcher.utter_message(text="Your ticket has been booked and saved!")
-        return []
-
-  
-        origin = tracker.get_slot("origin")
-        destination = tracker.get_slot("destination")
-        travel_date = tracker.get_slot("travel_date")
-        passenger_name = tracker.get_slot("passenger_name")
-        phone_number = tracker.get_slot("phone_number")
-        seat_preference = tracker.get_slot("seat_preference")
-        class_selection = tracker.get_slot("class_selection")
-        flight_time = tracker.get_slot("flight_time")
-
-
-        # Confirm booking
-        
         dispatcher.utter_message(
             text=(
-                f"✅ Booking confirmed!\n"
-                f"Passenger: {passenger_name}\n"
-                f"Phone: {phone_number}\n"
-                f"From: {origin} -> To: {destination}\n"
-                f"Date: {travel_date}\n"
-                f"Seat: {seat_preference}\n"
-                f"Class: {class_selection}\n"
-                f"Flight Time: {flight_time}\n"
-                "Thank you for choosing Flight Expert!"
+                f"✅ Booking Confirmed!\n\n"
+                f"📍 From → To: {origin} → {destination}\n"
+                f"📅 Date: {travel_date}\n"
+                f"⏰ Time: {flight_time}\n"
+                f"🎫 Class: {cls}\n"
+                f"🪑 Seat: {seat}\n"
+                f"👤 Passenger: {passenger_name}\n"
+                f"📞 Contact: {phone_number}\n"
+                f"👥 Travelers: {travel_count}\n\n"
+                f"💾 Booking saved successfully in the database."
             )
         )
+
         return [
             SlotSet("origin", None),
             SlotSet("destination", None),
             SlotSet("travel_date", None),
-            SlotSet("passenger_name", None),
-            SlotSet("phone_number", None),
+            SlotSet("flight_time", None),
             SlotSet("seat_preference", None),
             SlotSet("class_selection", None),
-            SlotSet("flight_time", None)
+            SlotSet("passenger_name", None),
+            SlotSet("phone_number", None),
+            SlotSet("travel_count", None)
         ]
+
+
+class ActionCache(Action):
+    def name(self) -> str:
+        return "action_cache"
+
+    def run(self, dispatcher: CollectingDispatcher, tracker: Tracker, domain: dict) -> list:
+        dispatcher.utter_message(json_message={"clear_chat": True})
+        return [Restarted(), FollowupAction(name="greet")]
 
 # --- Optional action for booking trigger ---
 class ActionBookFlight(Action):

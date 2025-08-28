@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS ticket_booking_details (
     phone_number TEXT,
     seat_preference TEXT,
     class_selection TEXT,
-    flight_time TEXT
+    flight_time TEXT,
+    travel_count INTEGER
 );
 """
 

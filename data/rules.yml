@@ -26,12 +26,6 @@ rules:
     - intent: inform_destination
     - action: flight_booking_form
 
-- rule: Fill travel date
-  condition:
-    - active_loop: flight_booking_form
-  steps:
-    - intent: inform_travel_date
-    - action: flight_booking_form
 
 - rule: Fill passenger name
   condition:
