@@ -164,130 +164,102 @@
     </div>
   </div>
 
-  <script>
-    const RASA_URL = "http://localhost:5005/webhooks/rest/webhook";
-    const messagesEl = document.getElementById('messages');
-    const userInput = document.getElementById('user-input');
-    const senderId = "user_" + Math.floor(Math.random() * 1000);
-    let history = JSON.parse(localStorage.getItem('chat_history')) || [];
+<script>
+  const RASA_URL = "http://localhost:5005/webhooks/rest/webhook";
+  const messagesEl = document.getElementById('messages');
+  const userInput = document.getElementById('user-input');
+  const senderId = "user_" + Math.floor(Math.random() * 1000000);
+  let history = JSON.parse(localStorage.getItem('chat_history')) || [];
 
-    if (history.length) {
-      history.forEach(m => appendBubble(m.role, m.text, false));
+  if (history.length) history.forEach(m => appendBubble(m.role, m.text, false));
+
+  function appendBubble(role, text, save = true, isHTML = false) {
+    const div = document.createElement('div');
+    div.className = 'bubble ' + role;
+    if (isHTML) div.innerHTML = text; else div.textContent = text;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    if (save && !isHTML) {
+      history.push({ role, text });
+      localStorage.setItem('chat_history', JSON.stringify(history));
     }
+  }
 
-    function appendBubble(role, text, save = true) {
-      const div = document.createElement('div');
-      div.className = 'bubble ' + role;
-      if (isHTML) {
-        div.innerHTML = text;
-      } else {
-        div.textContent = text;
-      }
-      messagesEl.appendChild(div);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-
-     if (save && !isHTML) {
-    history.push({ role, text });
-    localStorage.setItem('chat_history', JSON.stringify(history));
-      }
-    }
-
-    async function sendToRasa(text) {
-      appendBubble('user', text);
-      userInput.value = '';
-
-      try {
-        const res = await fetch(RASA_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sender: senderId, message: text })
-        });
-
-        const data = await res.json();
-        data.forEach(r => {
-          if (r.clear_chat) {
-            history = [];
-            localStorage.removeItem('chat_history');
-            messagesEl.innerHTML = '';
-            appendBubble('bot', '👋 Welcome! I am Flight Expert. How can I help you today?', false);
-          }
-          if (r.text) {
-            appendBubble('bot', r.text);
-          }
-        });
-      } catch (e) {
-        appendBubble('bot', "⚠️ Could not connect to Rasa server.");
-      }
-    }
-
-    function handleSend() {
-      const text = userInput.value.trim();
-      if (text) sendToRasa(text);
-    }
-
-
-
-    function showTyping() {
-      const typingDiv = document.createElement('div');
-      typingDiv.className = 'bubble bot';
-      typingDiv.id = 'typing-indicator';
-      typingDiv.textContent = 'Flight Expert is typing...';
-      messagesEl.appendChild(typingDiv);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-}
-
-    function hideTyping() {
-      const typingDiv = document.getElementById('typing-indicator');
-      if (typingDiv) typingDiv.remove();
-    }
-
-     function clearChat() {
-      history = [];
-      localStorage.removeItem('chat_history');
-      messagesEl.innerHTML = '';
-
-      // Show greeting after clearing
-      appendBubble('bot', '👋 Hello! I am Flight Expert.', false);
-    }
-
-    function restartSession() {
-      fetch(RASA_URL, {
+  async function sendToRasa(text) {
+    appendBubble('user', text);
+    userInput.value = '';
+    try {
+      const res = await fetch(RASA_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sender: senderId, message: '/action_cache' })
-      })
-      .then(res => res.json())
-      .then(data => {
-        let cleared = false;
-
-        data.forEach(r => {
-          if (r.clear_chat) {
-            history = [];
-            localStorage.removeItem('chat_history');
-            messagesEl.innerHTML = '';
-            cleared = true;
-          }
-          if (r.text) {
-            appendBubble('bot', r.text);
-          }
-        });
-
-        if (cleared && !data.some(r => r.text)) {
-          appendBubble('bot', '👋 Welcome! I am Flight Expert. How can I help you today?', false);
-        }
-      })
-      .catch(() => {
-        appendBubble('bot', "⚠️ Could not connect to Rasa server.");
+        body: JSON.stringify({ sender: senderId, message: text })
       });
+      const data = await res.json();
+      data.forEach(r => {
+        // ✅ accept both custom.clear_chat and top-level clear_chat (json_message)
+        if ((r.custom && r.custom.clear_chat) || r.clear_chat) {
+          history = [];
+          localStorage.removeItem('chat_history');
+          messagesEl.innerHTML = '';
+          appendBubble('bot', '👋 Welcome! I am Flight Expert. How can I help you today?', false);
+          return; // skip rendering other fields for this message
+        }
+        if (r.text) appendBubble('bot', r.text);
+      });
+    } catch (e) {
+      console.error(e);
+      appendBubble('bot', "⚠️ Could not connect to Rasa server.");
     }
+  }
 
-    userInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter') handleSend();
+  function handleSend() {
+    const text = userInput.value.trim();
+    if (text) sendToRasa(text);
+  }
+
+  function clearChat() {
+    history = [];
+    localStorage.removeItem('chat_history');
+    messagesEl.innerHTML = '';
+    appendBubble('bot', '👋 Hello! I am Flight Expert.', false);
+  }
+
+  function restartSession() {
+    fetch(RASA_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // send INTENT, not action name
+      body: JSON.stringify({ sender: senderId, message: '/clear_chat' })
+    })
+    .then(res => res.json())
+    .then(data => {
+      let cleared = false;
+      data.forEach(r => {
+        // ✅ same fix here
+        if ((r.custom && r.custom.clear_chat) || r.clear_chat) {
+          history = [];
+          localStorage.removeItem('chat_history');
+          messagesEl.innerHTML = '';
+          cleared = true;
+        }
+        if (r.text) appendBubble('bot', r.text);
+      });
+      if (cleared && !data.some(r => r.text)) {
+        appendBubble('bot', '👋 Welcome! I am Flight Expert. How can I help you today?', false);
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      appendBubble('bot', "⚠️ Could not connect to Rasa server.");
     });
+  }
 
-    if (history.length === 0) {
-      appendBubble('bot', '👋 Welcome! I am Flight Expert. How can I help you today?', false);
-    }
-  </script>
+  // Enter to send
+  userInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleSend(); });
+
+  // Auto-greet to force a POST on page load
+  if (history.length === 0) sendToRasa('/greet');
+</script>
+
 </body>
-</html>
+</html>     

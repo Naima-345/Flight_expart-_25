@@ -8,20 +8,22 @@ intents:
   - inform_travel_date
   - inform_passenger_name
   - inform_phone_number
-  - inform_seat_preference
   - inform_class_selection
   - inform_flight_time
   - inform_travel_count
+  - clear_chat 
+
+
 entities:
   - origin
   - destination
   - travel_date
   - passenger_name
   - phone_number
-  - seat_preference
   - class_selection
   - flight_time
   - travel_count
+
 slots:
   origin:
     type: text
@@ -47,7 +49,7 @@ slots:
           - active_loop: flight_booking_form
             requested_slot: travel_date
 
-  passenger_name:
+  passenger_name:          # primary contact (kept from your original)
     type: text
     mappings:
       - type: from_text
@@ -55,7 +57,7 @@ slots:
           - active_loop: flight_booking_form
             requested_slot: passenger_name
 
-  phone_number:
+  phone_number:            # primary contact phone (kept)
     type: text
     mappings:
       - type: from_text
@@ -63,13 +65,6 @@ slots:
           - active_loop: flight_booking_form
             requested_slot: phone_number
 
-  seat_preference:
-    type: text
-    mappings:
-      - type: from_text
-        conditions:
-          - active_loop: flight_booking_form
-            requested_slot: seat_preference
 
   class_selection:
     type: text
@@ -86,6 +81,7 @@ slots:
         conditions:
           - active_loop: flight_booking_form
             requested_slot: flight_time
+
   travel_count:
     type: text
     mappings:
@@ -94,19 +90,77 @@ slots:
           - active_loop: flight_booking_form
             requested_slot: travel_count
 
+  # --- NEW: dynamic passenger collection state ---
+  expected_passengers:
+    type: text
+    influence_conversation: false
+    mappings:
+      - type: custom
+
+  current_passenger_index:
+    type: text
+    influence_conversation: false
+    mappings:
+      - type: custom
+
+  current_passenger_name:
+    type: text
+    mappings:
+      - type: from_text
+        conditions:
+          - active_loop: flight_booking_form
+            requested_slot: current_passenger_name
+
+  current_passenger_phone:
+    type: text
+    mappings:
+      - type: from_text
+        conditions:
+          - active_loop: flight_booking_form
+            requested_slot: current_passenger_phone
+
+  current_passenger_email:
+    type: text
+    mappings:
+      - type: from_text
+        conditions:
+          - active_loop: flight_booking_form
+            requested_slot: current_passenger_email
+
+
+  current_passenger_seat_preference:
+    type: text
+    influence_conversation: false
+    mappings:
+      - type: from_text
+        conditions:
+          - active_loop: flight_booking_form
+            requested_slot: current_passenger_seat_preference
+
+  passengers:              # JSON list of passengers [{"name","phone","email"}, ...]
+    type: text
+    influence_conversation: false
+    mappings:
+      - type: custom
+
 forms:
   flight_booking_form:
     required_slots:
       - origin
       - destination
       - travel_date
-      - passenger_name
-      - phone_number
-      - seat_preference
+      - passenger_name        # primary contact
+      - phone_number          # primary contact phon
       - class_selection
       - flight_time
-      - travel_count
+      - travel_count          # sets up the loop in validation
 
+      # These three will repeat until current_passenger_index == expected_passengers,
+      # driven by `action_collect_passenger` after each email.
+      - current_passenger_name
+      - current_passenger_phone
+      - current_passenger_email
+      - current_passenger_seat_preference
 responses:
   utter_greet:
     - text: "Hi, I am Flight Expert. How can I help you today?"
@@ -121,26 +175,45 @@ responses:
     - text: "Which date do you want to travel?"
 
   utter_ask_passenger_name:
-    - text: "Please provide the passenger's name."
+    - text: "Please provide the primary passenger's name."
 
   utter_ask_phone_number:
     - text: "Please provide your phone number."
-
-  utter_ask_seat_preference:
-    - text: "Do you have a seat preference (window, aisle, middle)?"
 
   utter_ask_class_selection:
     - text: "Which class do you prefer (economy, business, first)?"
 
   utter_ask_flight_time:
     - text: "What time do you want to fly?"
+
   utter_ask_travel_count:
     - text: "How many travelers are there?"
+
+  # --- NEW: prompts for per-passenger details (with index) ---
+  utter_ask_current_passenger_name:
+    - text: "Please enter passenger {current_passenger_index}'s full name."
+
+  utter_ask_current_passenger_phone:
+    - text: "Please enter passenger {current_passenger_index}'s phone number."
+
+  utter_ask_current_passenger_email:
+    - text: "Please enter passenger {current_passenger_index}'s email address."
+  utter_ask_current_passenger_seat_preference:
+    - text: "Please choose a seat preference for passenger {current_passenger_index} (window, aisle, middle)."
+      buttons:
+        - title: "Window"
+          payload: "window"
+        - title: "Aisle"
+          payload: "aisle"
+        - title: "Middle"
+          payload: "middle"
 
 actions:
   - action_submit_booking
   - action_book_flight
   - validate_flight_booking_form
+  - action_cache
+       # NEW: advances the passenger loop
 
 session_config:
   session_expiration_time: 60

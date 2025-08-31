@@ -12,6 +12,7 @@ rules:
     - action: flight_booking_form
     - active_loop: flight_booking_form
 
+# Slot-filling helper rules (optional; form works without these, but safe to keep)
 - rule: Fill origin
   condition:
     - active_loop: flight_booking_form
@@ -26,26 +27,25 @@ rules:
     - intent: inform_destination
     - action: flight_booking_form
 
+- rule: Fill travel date
+  condition:
+    - active_loop: flight_booking_form
+  steps:
+    - intent: inform_travel_date
+    - action: flight_booking_form
 
-- rule: Fill passenger name
+- rule: Fill passenger name (primary contact)
   condition:
     - active_loop: flight_booking_form
   steps:
     - intent: inform_passenger_name
     - action: flight_booking_form
 
-- rule: Fill phone number
+- rule: Fill phone number (primary contact)
   condition:
     - active_loop: flight_booking_form
   steps:
     - intent: inform_phone_number
-    - action: flight_booking_form
-
-- rule: Fill seat preference
-  condition:
-    - active_loop: flight_booking_form
-  steps:
-    - intent: inform_seat_preference
     - action: flight_booking_form
 
 - rule: Fill class selection
@@ -62,6 +62,9 @@ rules:
     - intent: inform_flight_time
     - action: flight_booking_form
 
+# No rule for seat_preference (removed)
+
+# Submit when the form is done
 - rule: Submit flight booking
   condition:
     - active_loop: flight_booking_form
@@ -69,3 +72,10 @@ rules:
     - action: flight_booking_form
     - active_loop: null
     - action: action_submit_booking
+
+  # ... your other rules ...
+
+- rule: Clear chat
+  steps:
+      - intent: clear_chat
+      - action: action_cache

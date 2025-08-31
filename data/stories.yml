@@ -1,73 +1,53 @@
 version: "3.1"
 
 stories:
-- story: flight booking path
-  steps:
-  - intent: greet
-  - action: utter_greet
-  - intent: book_flight
-  - action: flight_booking_form
-  - active_loop: flight_booking_form
-  - action: utter_ask_origin
-  - intent: inform_origin
-  - slot_was_set:
-      - origin: "Bangladesh"
-  - action: flight_booking_form
-  - action: utter_ask_destination
-  - intent: inform_destination
-  - slot_was_set:
-      - destination: "Japan"
-  - action: flight_booking_form
-  - intent: inform_travel_date
-  - slot_was_set:
-      - travel_date: "20th October"
-  - action: flight_booking_form
-  - action: utter_ask_passenger_name
-  - intent: inform_passenger_name
-  - slot_was_set:
-      - passenger_name: "John Doe"
-  - action: flight_booking_form
-  - action: utter_ask_phone_number
-  - intent: inform_phone_number
-  - slot_was_set:
-      - phone_number: "+1234567890"
-  - action: flight_booking_form
-  - action: utter_ask_seat_preference
-  - intent: inform_seat_preference
-  - slot_was_set:
-      - seat_preference: "window"
-  - action: flight_booking_form
-  - action: utter_ask_class_selection
-  - intent: inform_class_selection
-  - slot_was_set:
-      - class_selection: "business"
-  - action: flight_booking_form
-  - action: utter_ask_flight_time
-  - intent: inform_flight_time
-  - slot_was_set:
-      - flight_time: "10:00 AM"
-  - action: flight_booking_form
-  - action: utter_ask_travel_count
-  - intent: inform_travel_count
-  - slot_was_set:
-      - travel_count: 2
-  - action: flight_booking_form
-  - active_loop: null
-  - action: action_submit_booking
 
-- story: book flight with invalid destination
+- story: book flight - one traveler with entities (example)
   steps:
     - intent: book_flight
     - action: flight_booking_form
     - active_loop: flight_booking_form
-    - action: utter_ask_destination
-    - intent: inform_destination
-    - slot_was_set:
-        - destination: "Sweden"
+
+    - intent: inform_origin
+      entities:
+        - origin: "Bangladesh"
     - action: flight_booking_form
+
     - intent: inform_destination
-    - slot_was_set:
-        - destination: "Bangladesh"
+      entities:
+        - destination: "India"
+    - action: flight_booking_form
+
+    - intent: inform_travel_date
+      entities:
+        - travel_date: "15/10/2025"
+    - action: flight_booking_form
+
+    - intent: inform_passenger_name
+      entities:
+        - passenger_name: "Primary User"
+    - action: flight_booking_form
+
+    - intent: inform_phone_number
+      entities:
+        - phone_number: "+8801711000000"
+    - action: flight_booking_form
+
+    - intent: inform_class_selection
+      entities:
+        - class_selection: "economy"
+    - action: flight_booking_form
+
+    - intent: inform_flight_time
+      entities:
+        - flight_time: "morning"
+    - action: flight_booking_form
+
+    - intent: inform_travel_count
+      entities:
+        - travel_count: "1"
+    - action: flight_booking_form
+
     - action: flight_booking_form
     - active_loop: null
     - action: action_submit_booking
