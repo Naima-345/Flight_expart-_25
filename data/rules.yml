@@ -1,81 +1,48 @@
 version: "3.1"
 
 rules:
-- rule: Greet user
+- rule: Greet
   steps:
-    - intent: greet
-    - action: utter_greet
-
-- rule: Start flight booking form
+  - intent: greet
+  - action: utter_greet
+- rule: Activate flight booking form
   steps:
-    - intent: book_flight
-    - action: flight_booking_form
-    - active_loop: flight_booking_form
+  - intent: book_flight
+  - action: flight_booking_form
+  - active_loop: flight_booking_form
 
-# Slot-filling helper rules (optional; form works without these, but safe to keep)
-- rule: Fill origin
+- rule: Submit flight booking form
   condition:
-    - active_loop: flight_booking_form
+  - active_loop: flight_booking_form
   steps:
-    - intent: inform_origin
-    - action: flight_booking_form
+  - action: flight_booking_form
+  - active_loop: null
+  - action: action_submit_booking
 
-- rule: Fill destination
-  condition:
-    - active_loop: flight_booking_form
-  steps:
-    - intent: inform_destination
-    - action: flight_booking_form
-
-- rule: Fill travel date
-  condition:
-    - active_loop: flight_booking_form
-  steps:
-    - intent: inform_travel_date
-    - action: flight_booking_form
-
-- rule: Fill passenger name (primary contact)
-  condition:
-    - active_loop: flight_booking_form
-  steps:
-    - intent: inform_passenger_name
-    - action: flight_booking_form
-
-- rule: Fill phone number (primary contact)
-  condition:
-    - active_loop: flight_booking_form
-  steps:
-    - intent: inform_phone_number
-    - action: flight_booking_form
-
-- rule: Fill class selection
-  condition:
-    - active_loop: flight_booking_form
-  steps:
-    - intent: inform_class_selection
-    - action: flight_booking_form
-
-- rule: Fill flight time
-  condition:
-    - active_loop: flight_booking_form
-  steps:
-    - intent: inform_flight_time
-    - action: flight_booking_form
-
-# No rule for seat_preference (removed)
-
-# Submit when the form is done
-- rule: Submit flight booking
-  condition:
-    - active_loop: flight_booking_form
-  steps:
-    - action: flight_booking_form
-    - active_loop: null
-    - action: action_submit_booking
-
-  # ... your other rules ...
 
 - rule: Clear chat
   steps:
-      - intent: clear_chat
-      - action: action_cache
+  - intent: clear_chat
+  - action: action_cache
+
+- rule: Start booking lookup
+  steps:
+  - intent: check_booking
+  - action: action_ask_lookup
+
+- rule: Perform booking lookup
+  steps:
+  - action: action_ask_lookup
+  - intent: inform_phone_number
+  - action: action_lookup_booking
+
+- rule: NLU fallback
+  steps:
+  - intent: nlu_fallbacks
+  - action: utter_nlu_fallbacks
+
+- rule: Thank you
+  steps:
+  - intent: thank_you
+  - action: utter_thank_you
+

@@ -1,91 +1,47 @@
-#### This file contains tests to evaluate that your bot behaves as expected.
-#### If you want to learn more, please see the docs: https://rasa.com/docs/rasa/testing-your-assistant
+# version: "3.1"
+# stories:
+# - story: book flight — one traveler complete (max coverage, intent-only)
+#   steps:
+#     - intent: book_flight
+#     - action: flight_booking_form
+#     - active_loop: flight_booking_form
 
-stories:
-- story: happy path 1
-  steps:
-  - user: |
-      hello there!
-    intent: greet
-  - action: utter_greet
-  - user: |
-      amazing
-    intent: mood_great
-  - action: utter_happy
+#     # origin → destination → travel_date
+#     - intent: inform_origin
+#     - action: flight_booking_form
+#     - intent: inform_destination
+#     - action: flight_booking_form
+#     - intent: inform_travel_date          # travel_date
+#     - action: flight_booking_form
 
-- story: happy path 2
-  steps:
-  - user: |
-      hello there!
-    intent: greet
-  - action: utter_greet
-  - user: |
-      amazing
-    intent: mood_great
-  - action: utter_happy
-  - user: |
-      bye-bye!
-    intent: goodbye
-  - action: utter_goodbye
+#     # (OPTIONAL) if your form asks to pick a flight by text
+#     - intent: ask_flights
+#     - action: flight_booking_form
 
-- story: sad path 1
-  steps:
-  - user: |
-      hello
-    intent: greet
-  - action: utter_greet
-  - user: |
-      not good
-    intent: mood_unhappy
-  - action: utter_cheer_up
-  - action: utter_did_that_help
-  - user: |
-      yes
-    intent: affirm
-  - action: utter_happy
+#     # (OPTIONAL) if your form asks for a return date, this pair will satisfy it
+#     - intent: inform_travel_date          # reused to satisfy return_date if requested
+#     - action: flight_booking_form
 
-- story: sad path 2
-  steps:
-  - user: |
-      hello
-    intent: greet
-  - action: utter_greet
-  - user: |
-      not good
-    intent: mood_unhappy
-  - action: utter_cheer_up
-  - action: utter_did_that_help
-  - user: |
-      not really
-    intent: deny
-  - action: utter_goodbye
+#     # primary contact (these two are commonly missed)
+#     - intent: inform_passenger_name       # passenger_name
+#     - action: flight_booking_form
+#     - intent: inform_phone_number         # phone_number
+#     - action: flight_booking_form
 
-- story: sad path 3
-  steps:
-  - user: |
-      hi
-    intent: greet
-  - action: utter_greet
-  - user: |
-      very terrible
-    intent: mood_unhappy
-  - action: utter_cheer_up
-  - action: utter_did_that_help
-  - user: |
-      no
-    intent: deny
-  - action: utter_goodbye
+#     # booking-level
+#     - intent: inform_class_selection      # class_selection
+#     - action: flight_booking_form
+#     - intent: inform_travel_count         # travel_count (use 1 in real convo)
+#     - action: flight_booking_form
 
-- story: say goodbye
-  steps:
-  - user: |
-      bye-bye!
-    intent: goodbye
-  - action: utter_goodbye
-
-- story: bot challenge
-  steps:
-  - user: |
-      are you a bot?
-    intent: bot_challenge
-  - action: utter_iamabot
+#     # per-passenger loop for traveler 1
+#     - intent: inform_passenger_name       # current_passenger_name
+#     - action: flight_booking_form
+#     - intent: inform_phone_number         # current_passenger_phone
+#     - action: flight_booking_form
+#     - intent: inform_phone_number         # reused for current_passenger_email
+#     - action: flight_booking_form
+#     - intent: inform_class_selection      # reused for current_passenger_seat_preference (window/aisle/middle)
+#     - action: flight_booking_form
+#     - active_loop: null
+#     - action: action_submit_booking

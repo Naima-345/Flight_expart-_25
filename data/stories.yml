@@ -2,52 +2,109 @@ version: "3.1"
 
 stories:
 
-- story: book flight - one traveler with entities (example)
+    
+
+
+- story: book_flight__flight_found_then_continue_full
   steps:
+    - intent: greet
+    - action: utter_greet
+
     - intent: book_flight
     - action: flight_booking_form
     - active_loop: flight_booking_form
 
+    # origin
     - intent: inform_origin
       entities:
-        - origin: "Bangladesh"
+        - origin: "Dhaka"
     - action: flight_booking_form
+    - slot_was_set:
+        - origin: "Dhaka"
+    - slot_was_set:
+        - requested_slot: destination
 
+    # destination
     - intent: inform_destination
       entities:
         - destination: "India"
     - action: flight_booking_form
+    - slot_was_set:
+        - destination: "India"
+    - slot_was_set:
+        - requested_slot: travel_date
 
+    # travel_date  -> validator shows flights (found) and continues
     - intent: inform_travel_date
       entities:
-        - travel_date: "15/10/2025"
+        - travel_date: "11/09/2025"
     - action: flight_booking_form
+    - slot_was_set:
+        - travel_date: "11/09/2025"
+    - slot_was_set:
+        - requested_slot: passenger_name
 
+    # primary passenger name
     - intent: inform_passenger_name
       entities:
-        - passenger_name: "Primary User"
+        - passenger_name: "Naima"
     - action: flight_booking_form
+    - slot_was_set:
+        - passenger_name: "Naima"
+    - slot_was_set:
+        - requested_slot: class_selection
 
-    - intent: inform_phone_number
-      entities:
-        - phone_number: "+8801711000000"
-    - action: flight_booking_form
-
+    # class
     - intent: inform_class_selection
       entities:
         - class_selection: "economy"
     - action: flight_booking_form
+    - slot_was_set:
+        - class_selection: "economy"
+    - slot_was_set:
+        - requested_slot: travel_count
 
-    - intent: inform_flight_time
-      entities:
-        - flight_time: "morning"
-    - action: flight_booking_form
-
+    # how many travelers
     - intent: inform_travel_count
       entities:
         - travel_count: "1"
     - action: flight_booking_form
+    - slot_was_set:
+        - travel_count: 1
+    - slot_was_set:
+        - requested_slot: return_date
 
+    # return_date (no specific intent exists; set slot directly)
+    - action: flight_booking_form
+    - slot_was_set:
+        - return_date: "20/09/2025"
+    - slot_was_set:
+        - requested_slot: current_passenger_name
+
+    # per-passenger loop (1 traveler)
+    - action: flight_booking_form
+    - slot_was_set:
+        - current_passenger_name: "Naima"
+    - slot_was_set:
+        - requested_slot: current_passenger_phone
+
+    - action: flight_booking_form
+    - slot_was_set:
+        - current_passenger_phone: "+8801711000000"
+    - slot_was_set:
+        - requested_slot: current_passenger_email
+
+    - action: flight_booking_form
+    - slot_was_set:
+        - current_passenger_email: "naima@example.com"
+    - slot_was_set:
+        - requested_slot: current_passenger_seat_preference
+
+    - action: flight_booking_form
+    - slot_was_set:
+        - current_passenger_seat_preference: "window"
+
+    # form finishes
     - action: flight_booking_form
     - active_loop: null
     - action: action_submit_booking

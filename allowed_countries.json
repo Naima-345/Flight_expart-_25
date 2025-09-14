@@ -1,4 +1,10 @@
-[
-    "Bangladesh", "India", "Japan", "France", "Germany",
-    "Canada", "Australia", "Brazil", "United Kingdom", "United States"
-]
+{
+  "Dali": {
+    "city": "Dali",
+    "iata": "DLU"
+  },
+  "Guangzhou Baiyun International": {
+    "city": "Guangzhou Baiyun International",
+    "iata": "CAN"
+  }
+}

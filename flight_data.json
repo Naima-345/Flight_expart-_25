@@ -1,0 +1,56 @@
+{
+  "pagination": {
+    "limit": 1,
+    "offset": 0,
+    "count": 1,
+    "total": 212003
+  },
+  "data": [
+    {
+      "flight_date": "2025-09-10",
+      "flight_status": "scheduled",
+      "departure": {
+        "airport": "Dali",
+        "timezone": "Asia/Shanghai",
+        "iata": "DLU",
+        "icao": "ZPDL",
+        "terminal": null,
+        "gate": "1-14",
+        "delay": null,
+        "scheduled": "2025-09-10T12:00:00+00:00",
+        "estimated": "2025-09-10T12:00:00+00:00",
+        "actual": null,
+        "estimated_runway": null,
+        "actual_runway": null
+      },
+      "arrival": {
+        "airport": "Guangzhou Baiyun International",
+        "timezone": "Asia/Shanghai",
+        "iata": "CAN",
+        "icao": "ZGGG",
+        "terminal": "2",
+        "gate": null,
+        "baggage": "35",
+        "scheduled": "2025-09-10T14:25:00+00:00",
+        "delay": null,
+        "estimated": null,
+        "actual": null,
+        "estimated_runway": null,
+        "actual_runway": null
+      },
+      "airline": {
+        "name": "China Southern Airlines",
+        "iata": "CZ",
+        "icao": "CSN"
+      },
+      "flight": {
+        "number": "5892",
+        "iata": "CZ5892",
+        "icao": "CSN5892",
+        "codeshared": null
+      },
+      "aircraft": null,
+      "live": null
+    }
+  ]
+}

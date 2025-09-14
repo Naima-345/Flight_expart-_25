@@ -2,264 +2,310 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Flight Expert Chat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#1e293b" />
+  <title>Flight Expert ✈️</title>
   <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #e0f7fa;
-      margin: 0;
-      height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+    :root{
+      --bg:#0b1220; --phone:#0f172a; --bar:#1e293b; --bar-text:#e2e8f0;
+      --panel:#0b1220; --bot:#2563eb; --bot-text:#fff; --user:#10b981; --user-text:#07131a;
+      --muted:#94a3b8; --ring:#334155; --accent:#22d3ee; --danger:#ef4444;
     }
+    *{box-sizing:border-box} html,body{height:100%}
+    body{
+      margin:0; display:flex; align-items:center; justify-content:center; height:100%;
+      background: radial-gradient(1200px 600px at 20% -10%, #1e3a8a55, transparent),
+                  radial-gradient(1000px 700px at 120% 120%, #0ea5e955, transparent),
+                  var(--bg);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      color:#e5e7eb;
+    }
+    .phone{ width:420px; max-width:95vw; height:720px; border-radius:36px; background:var(--phone);
+      box-shadow:0 30px 90px rgba(0,0,0,.6), inset 0 0 0 9px #111827;
+      display:flex; flex-direction:column; overflow:hidden; border:1px solid #0b1020; }
+    .statusbar{
+      height:56px; background:var(--bar); color:var(--bar-text); display:flex; align-items:center;
+      justify-content:space-between; padding:0 14px; border-bottom:1px solid var(--ring);
+    }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.3px; }
+    .brand .dot{ width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 22px var(--accent); }
+    .actions{ display:flex; gap:8px; align-items:center }
+    .btn{ appearance:none; border:1px solid var(--ring); background:#0b1220; color:#e2e8f0;
+      padding:7px 10px; border-radius:10px; font-weight:600; font-size:12px; cursor:pointer; }
+    .btn:active{ transform: scale(.98) }
 
-    .phone-frame {
-      width: 420px;
-      max-width: 95%;
-      height: 650px;
-      background: #fff;
-      border-radius: 40px;
-      box-shadow: 0 12px 30px rgba(0,0,0,0.3);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      border: 8px solid #333;
-      position: relative;
-    }
+    #messages{ flex:1; overflow:auto; background:var(--panel); padding:14px 14px 6px; }
+    #messages::-webkit-scrollbar{ width:8px } #messages::-webkit-scrollbar-thumb{ background:#223047; border-radius:8px }
+    .day-sep{ text-align:center; color:#93a1b5; font-size:11px; margin:8px 0; }
 
-    .navbar {
-      height: 50px;
-      background: #66a6ff;
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 15px;
-      font-weight: bold;
-      font-size: 16px;
-    }
+    .row{ display:flex; gap:8px; margin:8px 0; align-items:flex-end }
+    .row.user{ justify-content:flex-end }
+    .avatar{ width:28px; height:28px; border-radius:50%; background:#0ea5e9; display:flex; align-items:center; justify-content:center; font-size:14px; color:#002126 }
+    .avatar.user{ background:#34d399; color:#053419 }
 
-    .navbar-buttons button {
-      background: #f87171;
-      color: white;
-      border: none;
-      border-radius: 15px;
-      padding: 5px 10px;
-      font-size: 12px;
-      font-weight: bold;
-      cursor: pointer;
-      margin-left: 8px;
-      transition: background 0.3s ease;
-    }
+    .bubble{ max-width:74%; padding:10px 12px; border-radius:16px; line-height:1.35; white-space:pre-wrap; border:1px solid var(--ring) }
+    .bubble.bot{ background:linear-gradient(#1e293b,#0b1220); color:var(--bar-text); border-top-left-radius:4px }
+    .bubble.user{ background:linear-gradient(#ecfeff,#ccfbf1); color:#05242a; border-bottom-right-radius:4px }
+    .meta{ font-size:10px; color:#9aa8bd; margin-top:4px }
 
-    .navbar-buttons button:hover {
-      background: #dc2626;
-    }
+    .card{ background:#0b1220; border:1px solid var(--ring); border-radius:14px; padding:12px; margin-top:8px; box-shadow:0 6px 24px rgba(0,0,0,.25) }
+    .card h4{ margin:0 0 8px; color:#93c5fd }
+    .flights{ display:flex; flex-direction:column; gap:8px }
+    .flight{ display:flex; gap:10px; align-items:center; justify-content:space-between; padding:10px; background:#0f1a2f; border:1px solid #1f2b46; border-radius:12px }
+    .flight small{ color:#93a1b5 } .flight .sel{ display:flex; flex-direction:column }
 
-    .spacer {
-      height: 5em;
-    }
+    .quick{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px }
+    .chip{ border:1px solid var(--ring); background:#0b1220; color:#cbd5e1; padding:7px 10px; border-radius:999px; font-size:12px; cursor:pointer }
 
-    #messages {
-      flex: 1;
-      padding: 15px;
-      overflow-y: auto;
-      background: #f0f4f8;
-    }
-
-    .bubble {
-      padding: 10px 15px;
-      margin: 5px 0;
-      border-radius: 15px;
-      max-width: 80%;
-      word-wrap: break-word;
-    }
-    .bubble.bot {
-      background: #66a6ff;
-      color: #fff;
-      align-self: flex-start;
-      border-bottom-left-radius: 0;
-    }
-    .bubble.user {
-      background: #89f7fe;
-      color: #000;
-      align-self: flex-end;
-      border-bottom-right-radius: 0;
-    }
-
-    .input-area {
-      display: flex;
-      padding: 10px;
-      background: #e2e8f0;
-    }
-    .input-area input {
-      flex: 1;
-      padding: 10px;
-      border-radius: 25px;
-      border: 1px solid #ccc;
-      outline: none;
-      font-size: 14px;
-    }
-    .input-area button {
-      margin-left: 10px;
-      padding: 10px 15px;
-      border: none;
-      border-radius: 25px;
-      background-color: #66a6ff;
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-      transition: background 0.3s ease;
-    }
-    .input-area button:hover {
-      background-color: #5589d6;
-    }
-
-    #messages::-webkit-scrollbar {
-      width: 6px;
-    }
-    #messages::-webkit-scrollbar-thumb {
-      background-color: rgba(0,0,0,0.2);
-      border-radius: 3px;
-    }
-
-
-
-    .booking-card {
-      background: #e0f7fa;
-      border: 2px solid #66a6ff;
-      border-radius: 15px;
-      padding: 10px 15px;
-      margin: 10px 0;
-      font-size: 14px;
-      color: #333;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-    }
-    .booking-card h4 {
-      margin-top: 0;
-      color: #0077b6;
-    }
-
+    .composer{ padding:10px; background:#0b1220; border-top:1px solid var(--ring); display:flex; gap:8px }
+    .composer input{ flex:1; background:#0f172a; color:#e2e8f0; border:1px solid var(--ring); border-radius:12px; padding:12px; font-size:14px; outline:none }
+    .send{ background:var(--bot); color:#fff; border:none; border-radius:12px; padding:12px 14px; font-weight:700; cursor:pointer }
   </style>
 </head>
 <body>
-  <div class="phone-frame">
-    <div class="navbar">
-      <div>✈️ Flight Expert</div>
-      <div class="navbar-buttons">
-        <button onclick="clearChat()">Clear Chat</button>
-        <button onclick="restartSession()">Restart Session</button>
+  <div class="phone" role="application" aria-label="Flight Expert chat">
+    <div class="statusbar">
+      <div class="brand"><span class="dot" aria-hidden="true"></span> Flight Expert</div>
+      <div class="actions">
+        <button class="btn" id="btn-restart" type="button" title="Restart session">Restart</button>
       </div>
     </div>
 
-    <div class="spacer"></div>
+    <div id="messages" aria-live="polite" aria-atomic="false"></div>
 
-    <div id="messages"></div>
-
-    <div class="input-area">
-      <input type="text" id="user-input" placeholder="Type a message..." />
-      <button onclick="handleSend()">Send</button>
-    </div>
+    <form class="composer" id="composer" autocomplete="off">
+      <input id="input" type="text" placeholder="Type a message…" aria-label="Message" />
+      <button class="send" type="submit">Send</button>
+    </form>
   </div>
 
-<script>
-  const RASA_URL = "http://localhost:5005/webhooks/rest/webhook";
-  const messagesEl = document.getElementById('messages');
-  const userInput = document.getElementById('user-input');
-  const senderId = "user_" + Math.floor(Math.random() * 1000000);
-  let history = JSON.parse(localStorage.getItem('chat_history')) || [];
+  <script>
+  // --- CONFIG ------------------------------------------------------------
+  const DEFAULT_ENDPOINT = "http://localhost:5005/webhooks/rest/webhook";
+  const urlParams = new URLSearchParams(location.search);
+  const RASA_URL = urlParams.get("endpoint") || DEFAULT_ENDPOINT;
+  const TIMEOUT_MS = 8000;
 
-  if (history.length) history.forEach(m => appendBubble(m.role, m.text, false));
+  const messagesEl = document.getElementById("messages");
+  const inputEl = document.getElementById("input");
+  const composer = document.getElementById("composer");
+  const btnRestart = document.getElementById("btn-restart");
 
-  function appendBubble(role, text, save = true, isHTML = false) {
-    const div = document.createElement('div');
-    div.className = 'bubble ' + role;
-    if (isHTML) div.innerHTML = text; else div.textContent = text;
-    messagesEl.appendChild(div);
+  // session id helpers (we want to regenerate on Restart)
+  function makeId(){ return "user_" + Math.random().toString(36).slice(2, 10); }
+  function getOrCreateSenderId(){
+    let id = localStorage.getItem("fe_sender_id");
+    if(!id){ id = makeId(); localStorage.setItem("fe_sender_id", id); }
+    return id;
+  }
+  let senderId = getOrCreateSenderId();
+
+  // chat history
+  let history = JSON.parse(localStorage.getItem("fe_history") || "[]");
+
+  // --- RENDERING ---------------------------------------------------------
+  function daySeparatorIfNeeded(ts){
+    const last = messagesEl.getAttribute("data-last-day");
+    const day = new Date(ts).toDateString();
+    if (last !== day){
+      const sep = document.createElement("div");
+      sep.className = "day-sep";
+      sep.textContent = day;
+      messagesEl.appendChild(sep);
+      messagesEl.setAttribute("data-last-day", day);
+    }
+  }
+  function row(role){
+    const r = document.createElement("div");
+    r.className = `row ${role}`;
+    const av = document.createElement("div");
+    av.className = `avatar ${role}`;
+    av.textContent = role === 'user' ? 'U' : 'FX';
+    if(role==='user') r.appendChild(av);
+    const col = document.createElement("div");
+    r.appendChild(col);
+    if(role==='bot') r.appendChild(av);
+    return {r, col};
+  }
+  function bubble(role, text){
+    const {r, col} = row(role);
+    const b = document.createElement("div");
+    b.className = `bubble ${role}`;
+    b.textContent = text;
+    col.appendChild(b);
+    const meta = document.createElement("div");
+    meta.className = 'meta';
+    meta.textContent = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    col.appendChild(meta);
+    messagesEl.appendChild(r);
     messagesEl.scrollTop = messagesEl.scrollHeight;
-    if (save && !isHTML) {
-      history.push({ role, text });
-      localStorage.setItem('chat_history', JSON.stringify(history));
-    }
+    return b;
+  }
+  function imageBubble(role, src, alt="image"){
+    const {r, col} = row(role);
+    const b = document.createElement("div");
+    b.className = `bubble ${role}`;
+    const img = document.createElement('img');
+    img.src = src; img.alt = alt; img.style.maxWidth = '220px'; img.style.borderRadius = '8px'; img.loading = 'lazy';
+    b.appendChild(img);
+    col.appendChild(b);
+    messagesEl.appendChild(r);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+  function quickReplies(buttons){
+    const wrap = document.createElement('div');
+    wrap.className = 'quick';
+    buttons.forEach(btn => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip';
+      chip.textContent = btn.title || btn.payload || 'Option';
+      chip.addEventListener('click', ()=> send(btn.payload || btn.title));
+      wrap.appendChild(chip);
+    });
+    return wrap;
+  }
+  function flightsCard(title, buttons){
+    const c = document.createElement('div'); c.className='card';
+    const h = document.createElement('h4'); h.textContent = title || 'Available flights'; c.appendChild(h);
+    const list = document.createElement('div'); list.className='flights';
+    buttons.forEach(btn=>{
+      const f = document.createElement('div'); f.className='flight';
+      const left = document.createElement('div'); left.className='sel';
+      const t = document.createElement('strong'); t.textContent = (btn.title || '').split('|')[0].trim(); left.appendChild(t);
+      const s = document.createElement('small'); s.textContent = (btn.title || '').split('|')[1]?.trim() || '';
+      left.appendChild(s);
+      const act = document.createElement('button'); act.type='button'; act.className='btn'; act.textContent = 'Select';
+      act.addEventListener('click', ()=> send(btn.payload || btn.title));
+      f.appendChild(left); f.appendChild(act); list.appendChild(f);
+    });
+    c.appendChild(list); return c;
   }
 
-  async function sendToRasa(text) {
-    appendBubble('user', text);
-    userInput.value = '';
-    try {
-      const res = await fetch(RASA_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sender: senderId, message: text })
-      });
-      const data = await res.json();
-      data.forEach(r => {
-        // ✅ accept both custom.clear_chat and top-level clear_chat (json_message)
-        if ((r.custom && r.custom.clear_chat) || r.clear_chat) {
-          history = [];
-          localStorage.removeItem('chat_history');
-          messagesEl.innerHTML = '';
-          appendBubble('bot', '👋 Welcome! I am Flight Expert. How can I help you today?', false);
-          return; // skip rendering other fields for this message
-        }
-        if (r.text) appendBubble('bot', r.text);
-      });
-    } catch (e) {
-      console.error(e);
-      appendBubble('bot', "⚠️ Could not connect to Rasa server.");
-    }
+  function typingOn(){
+    const wrap = document.createElement('div'); wrap.className = 'row bot typing-row';
+    const av = document.createElement('div'); av.className = 'avatar bot'; av.textContent='FX';
+    const col = document.createElement('div');
+    const t = document.createElement('div'); t.className='typing';
+    t.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+    col.appendChild(t);
+    wrap.appendChild(col); wrap.appendChild(av);
+    messagesEl.appendChild(wrap); messagesEl.scrollTop = messagesEl.scrollHeight;
   }
+  function typingOff(){ document.querySelectorAll('.typing-row').forEach(n=>n.remove()); }
 
-  function handleSend() {
-    const text = userInput.value.trim();
-    if (text) sendToRasa(text);
+  function persist(role, payload){
+    history.push({role, payload, ts: Date.now()});
+    localStorage.setItem('fe_history', JSON.stringify(history));
   }
-
-  function clearChat() {
-    history = [];
-    localStorage.removeItem('chat_history');
-    messagesEl.innerHTML = '';
-    appendBubble('bot', '👋 Hello! I am Flight Expert.', false);
-  }
-
-  function restartSession() {
-    fetch(RASA_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      // send INTENT, not action name
-      body: JSON.stringify({ sender: senderId, message: '/clear_chat' })
-    })
-    .then(res => res.json())
-    .then(data => {
-      let cleared = false;
-      data.forEach(r => {
-        // ✅ same fix here
-        if ((r.custom && r.custom.clear_chat) || r.clear_chat) {
-          history = [];
-          localStorage.removeItem('chat_history');
-          messagesEl.innerHTML = '';
-          cleared = true;
-        }
-        if (r.text) appendBubble('bot', r.text);
-      });
-      if (cleared && !data.some(r => r.text)) {
-        appendBubble('bot', '👋 Welcome! I am Flight Expert. How can I help you today?', false);
-      }
-    })
-    .catch(err => {
-      console.error(err);
-      appendBubble('bot', "⚠️ Could not connect to Rasa server.");
+  function replay(){
+    if(!history.length){ return; }
+    history.forEach(evt => {
+      daySeparatorIfNeeded(evt.ts);
+      if(evt.role==='user'){ bubble('user', evt.payload.text || evt.payload); }
+      else if(evt.role==='bot'){ renderBotPayload(evt.payload, false); }
     });
   }
 
-  // Enter to send
-  userInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleSend(); });
+  // --- HTTP --------------------------------------------------------------
+  async function postToRasa(message){
+    const ctrl = new AbortController();
+    const to = setTimeout(()=>ctrl.abort(), TIMEOUT_MS);
+    let res;
+    try{
+      res = await fetch(RASA_URL, {
+        method:'POST',
+        headers:{'Content-Type':'application/json', 'Accept':'application/json'},
+        body: JSON.stringify({ sender: senderId, message }),
+        signal: ctrl.signal
+      });
+    }finally{ clearTimeout(to); }
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+    if (res.ok && ct.includes('application/json')) return res.json();
+    const body = await res.text().catch(()=> '');
+    const err = new Error(`HTTP ${res.status}`); err.status = res.status; err.body = body; throw err;
+  }
 
-  // Auto-greet to force a POST on page load
-  if (history.length === 0) sendToRasa('/greet');
-</script>
+  // --- Chat wire ---------------------------------------------------------
+  async function send(text){
+    if(!text) return;
+    daySeparatorIfNeeded(Date.now());
+    bubble('user', text);
+    persist('user', {text});
+    inputEl.value='';
+    typingOn();
+    try{
+      const data = await postToRasa(text);
+      typingOff();
+      (Array.isArray(data)?data:[]).forEach(handleRasaMessage);
+      if(!data || !data.length) renderBotPayload({ text: '🤖 (No response received)' });
+    }catch{
+      typingOff();
+      renderBotPayload({ text: '⚠️ Could not connect to Rasa server.' });
+    }
+  }
 
+  function handleRasaMessage(r){
+    const clearFlag = (r.custom && r.custom.clear_chat) || r.clear_chat || (r.json_message && r.json_message.clear_chat);
+    if(clearFlag){ localClear('👋 Welcome! I am Flight Expert. How can I help you today?'); return; }
+    if(r.text) renderBotPayload({ text: r.text });
+    if(r.image) renderBotPayload({ image: r.image });
+    if(Array.isArray(r.buttons) && r.buttons.length){
+      const looksLikeFlights = r.buttons.some(b => /\b(Dep|Arr|AM|PM|\d{1,2}:\d{2})\b/i.test(b.title||''));
+      renderBotPayload(looksLikeFlights ? { flights:r.buttons, title:(r.text||'Available flights') } : { buttons:r.buttons });
+    }
+    if(Array.isArray(r.elements) && r.elements.length){
+      const mapped = r.elements.map(e=>({ title: e.title || e.subtitle || 'Select', payload: e.buttons?.[0]?.payload }));
+      renderBotPayload({ buttons: mapped, title: r.text });
+    }
+    if(r.custom && r.custom.type === 'flights'){ renderBotPayload({ flights: r.custom.items, title: r.custom.title }); }
+  }
+
+  function renderBotPayload(payload, save=true){
+    daySeparatorIfNeeded(Date.now());
+    if(payload.text) bubble('bot', payload.text);
+    if(payload.image) imageBubble('bot', payload.image);
+    if(payload.flights){
+      const {r, col} = row('bot');
+      const c = flightsCard(payload.title || 'Available flights', payload.flights);
+      col.appendChild(c); messagesEl.appendChild(r); messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+    if(payload.buttons){
+      const {r, col} = row('bot');
+      const wrap = quickReplies(payload.buttons);
+      col.appendChild(wrap); messagesEl.appendChild(r); messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+    if(save) persist('bot', payload);
+  }
+
+  function localClear(message){
+    history=[]; localStorage.removeItem('fe_history');
+    messagesEl.innerHTML=''; messagesEl.removeAttribute('data-last-day');
+    renderBotPayload({ text: message }, false);
+  }
+
+  // hard restart: wipe history + new sender id (session)
+  function restartChat(){
+    localStorage.removeItem('fe_history');
+    localStorage.removeItem('fe_sender_id');
+    history = [];
+    senderId = getOrCreateSenderId(); // new session id
+    messagesEl.innerHTML = '';
+    messagesEl.removeAttribute('data-last-day');
+    renderBotPayload({ text: '🧼 Chat reset. Type /greet to start.' }, false);
+  }
+
+  // --- UX wiring ---------------------------------------------------------
+  composer.addEventListener('submit', e=>{
+    e.preventDefault();
+    const t = (inputEl.value||'').trim();
+    if(t) send(t);
+  });
+  btnRestart.addEventListener('click', restartChat);
+
+  // --- Kickoff -----------------------------------------------------------
+  replay();
+  // (no auto-greet here; truly clean until user types)
+  </script>
 </body>
-</html>     
+</html>

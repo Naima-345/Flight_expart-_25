@@ -1,70 +1,90 @@
-
 version: "3.1"
-
 nlu:
 - intent: greet
   examples: |
     - hello
     - hi
     - hey
-
 - intent: book_flight
   examples: |
     - I want to book a flight
     - Book a ticket for me
-    - book a flight 
-
-
+    - book a flight
+    - book aflight
 - intent: inform_origin
   examples: |
-    - My origin is Bangladesh
-    - I want to fly from Japan
+    - want to fly from Japan
     - From Canada
-
+    - Brisbane
 - intent: inform_destination
   examples: |
     - I want to go to France
     - Destination is Germany
     - To Australia
-
+    - Dubai
+    - dali
+    - Guangzho baiyun international
+    - Guangzho Baiyun International
+    - Guangzhou Baiyun International
 - intent: inform_travel_date
   examples: |
     - I will travel on 20th October
     - Travel date is 15/09/2025
     - On 1st December
-
+    - 10/09/2025
 - intent: inform_passenger_name
   examples: |
     - My name is John Doe
     - Passenger name is Jane Smith
     - Naima Nawar
-
 - intent: inform_phone_number
   examples: |
     - My phone number is +1234567890
     - Contact number is 987654321
     - 01715041394
-
 - intent: inform_class_selection
   examples: |
     - I want business class
     - Book me in economy
     - First class please
-
-- intent: inform_flight_time
-  examples: |
-    - I want to fly at 10:00 AM
-    - Flight time is 18:30
-    - At 7 PM
-    - afternoon flight
 - intent: inform_travel_count
   examples: |
-    - 3 
+    - 3
     - 2
-- intent: clear_chat 
+    - we are 4
+    - total 5
+    - 6 passengers
+- intent: clear_chat
   examples: |
-    - clear chat 
-    - clear 
-    - reset 
+    - clear chat
+    - clear
+    - reset
     - restart
-    
+- intent: check_booking
+  examples: |
+    - check my booking
+    - do I have a booking
+    - look up my booking
+    - find my booking
+- intent: thank_you
+  examples: |
+    - thanks
+    - thank you
+    - thx
+    - thank you so much
+    - thank you very much
+- intent: nlu_fallbacks
+  examples: |
+    - weather check
+    - what is the time
+    - who are you
+    - what can you do
+    - what is your name
+    - what is rasa
+    - what is rasa chatbot
+- regex: email
+  examples: |
+    - [^@\s]+@[^@\s]+\.[^@\s]+
+- regex: phone_11_digits
+  examples: |
+    - \b\d{11}\b

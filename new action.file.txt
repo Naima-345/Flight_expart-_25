@@ -1,0 +1,690 @@
+from typing import Any, Text, Dict, List, Optional, Tuple
+from rasa_sdk import Action, Tracker, FormValidationAction
+from rasa_sdk.executor import CollectingDispatcher
+from rasa_sdk.events import SlotSet, Restarted, FollowupAction
+import json
+import os
+import sqlite3
+from datetime import datetime
+import re
+
+
+# --- Allowed countries loader (unchanged) ---
+def load_allowed_countries() -> Dict[str, str]:
+    json_path = os.path.join(os.path.dirname(__file__), '..', 'allowed_countries.json')
+    with open(json_path, 'r') as f:
+        cities = json.load(f)
+    return {c["city"].title(): c["iata"].upper() for c in cities}
+
+CITY_TO_IATA = load_allowed_countries()
+
+ALLOWED_COUNTRIES = load_allowed_countries()
+ALLOWED_COUNTRIES_SET = {c.strip().title() for c in ALLOWED_COUNTRIES}
+
+def validate_country(country: str) -> bool:
+    return bool(country) and country.strip().title() in ALLOWED_COUNTRIES_SET
+
+def format_country_list() -> str:
+    return "\n".join(f"• {country}" for country in sorted(ALLOWED_COUNTRIES_SET))
+
+
+# If you want to override via env, set FLIGHTS_DB=/path/to/flight_d.db
+FLIGHTS_DB_PATH = os.getenv("FLIGHTS_DB", "flights.db")
+
+def _city_to_iata(name: str) -> str:
+    """Map a city to its IATA; fallback to uppercased input."""
+    key = (name or "").strip().title()
+    return CITY_TO_IATA.get(key, (name or "").strip().upper())
+
+# --- DB helpers (BOOKINGS + PASSENGERS with per-passenger seat) ---
+DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'bookings.db')
+
+def _ensure_db():
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS bookings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                origin TEXT,
+                destination TEXT,
+                travel_date TEXT,
+                flight_name TEXT,
+                flight_schedule_time TEXT,
+                seat_preference TEXT,      -- (legacy/global; optional)
+                class_selection TEXT,
+                passenger_name TEXT,       -- primary contact
+                phone_number TEXT,         -- primary contact
+                travel_count INTEGER,
+                return_date TEXT,
+                created_at TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS passengers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                booking_id INTEGER,
+                name TEXT,
+                phone TEXT,
+                email TEXT,
+                seat_preference TEXT,      -- per-passenger seat
+                FOREIGN KEY(booking_id) REFERENCES bookings(id)
+            )
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+def _save_booking(row: Dict[str, Any]) -> int:
+    _ensure_db()
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+         INSERT INTO bookings
+            (origin, destination, travel_date, flight_name, flight_schedule_time, return_date, seat_preference, class_selection,
+            passenger_name, phone_number, travel_count, created_at)
+            VALUES (:origin, :destination, :travel_date, :flight_name, :flight_schedule_time, :return_date, :seat_preference, :class_selection,
+            :passenger_name, :phone_number, :travel_count, :created_at)
+            """,
+            {**row, "created_at": datetime.utcnow().isoformat()}
+        )
+        booking_id = cur.lastrowid
+        conn.commit()
+        return booking_id
+    finally:
+        conn.close()
+
+def _save_passengers(booking_id: int, passengers: List[Dict[str, str]]):
+    if not passengers:
+        return
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.executemany(
+            "INSERT INTO passengers (booking_id, name, phone, email, seat_preference) VALUES (?, ?, ?, ?, ?)",
+            [
+                (booking_id, p.get("name",""), p.get("phone",""), p.get("email",""), p.get("seat",""))
+                for p in passengers
+            ]
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+# --- Helper: query flights for a specific route & date (DD/MM/YYYY) ---
+def _query_flights_for_date(origin: str, destination: str, travel_date: str) -> List[tuple]:
+    """Return rows: (flight_name, departure_time, arrival_time) or [] if none."""
+    try:
+        date_iso = datetime.strptime(travel_date, "%d/%m/%Y").date().isoformat()
+    except Exception:
+        return []
+
+    dep = _city_to_iata(origin)
+    arr = _city_to_iata(destination)
+    if not dep or not arr or len(dep) < 3 or len(arr) < 3:
+        return []
+
+    conn = sqlite3.connect(FLIGHTS_DB_PATH)
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT flight_name, departure_time, arrival_time
+            FROM flights
+            WHERE flight_date = ? AND dep_iata = ? AND arr_iata = ?
+            ORDER BY departure_time
+            """,
+            (date_iso, dep, arr),
+        )
+        return cur.fetchall() or []
+    except Exception:
+        return []
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+# ------------------- FORM VALIDATION -------------------
+
+class ValidateFlightBookingForm(FormValidationAction):
+
+    def name(self) -> Text:
+        return "validate_flight_booking_form"
+
+    def _normalize_country(self, value: Optional[Text]) -> Optional[Text]:
+        return value.strip().title() if value else value
+
+    # >>> helper to parse "from X to Y" or "X to Y"
+    def _parse_from_to(self, text: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Try to extract (origin, destination) from text like:
+        - "from Bangladesh to Canada"
+        - "Bangladesh to Canada"
+        """
+        if not text:
+            return None, None
+
+        s = text.strip()
+        m = re.match(r"^\s*from\s+(.+?)\s+to\s+(.+?)\s*$", s, flags=re.IGNORECASE)
+        if m:
+            o = m.group(1).strip().title()
+            d = m.group(2).strip().title()
+            return o, d
+
+        m2 = re.match(r"^\s*(.+?)\s+to\s+(.+?)\s*$", s, flags=re.IGNORECASE)
+        if m2:
+            o = m2.group(1).strip().title()
+            d = m2.group(2).strip().title()
+            return o, d
+
+        return None, None
+
+    # ---------------------------
+    # Origin / Destination
+    # ---------------------------
+
+    def validate_origin(self, value, dispatcher, tracker, domain):
+        o, d = self._parse_from_to(value)
+        if o and d and validate_country(o) and validate_country(d):
+            if o == d:
+                dispatcher.utter_message(text="Origin and destination cannot be the same. Please choose different places.")
+                return {"origin": None}
+            dispatcher.utter_message(text=f"Got it ✅ Origin: {o}, Destination: {d}.")
+            return {"origin": o, "destination": d}
+
+        norm = self._normalize_country(value)
+        if validate_country(norm):
+            dest = tracker.get_slot("destination")
+            if dest and norm == self._normalize_country(dest):
+                dispatcher.utter_message(text="Origin and destination cannot be the same. Please choose a different origin.")
+                return {"origin": None}
+            return {"origin": norm}
+
+        dispatcher.utter_message(
+            text=f"Sorry, '{value}' is not supported.\nChoose origin from:\n{format_country_list()}"
+        )
+        return {"origin": None}
+
+    def validate_destination(self, value, dispatcher, tracker, domain):
+        o, d = self._parse_from_to(value)
+        if o and d and validate_country(o) and validate_country(d):
+            if o == d:
+                dispatcher.utter_message(text="Origin and destination cannot be the same. Please choose different places.")
+                return {"destination": None}
+            dispatcher.utter_message(text=f"Got it ✅ Origin: {o}, Destination: {d}.")
+            return {"origin": o, "destination": d}
+
+        if not d:
+            norm = self._normalize_country(value)
+            if validate_country(norm):
+                origin = tracker.get_slot("origin")
+                if origin and norm == self._normalize_country(origin):
+                    dispatcher.utter_message(text="Origin and destination cannot be the same. Please choose a different destination.")
+                    return {"destination": None}
+                return {"destination": norm}
+            dispatcher.utter_message(
+                text=f"Sorry, '{value}' is not supported.\nChoose destination from:\n{format_country_list()}"
+            )
+            return {"destination": None}
+
+        if validate_country(d):
+            origin = tracker.get_slot("origin")
+            if origin and self._normalize_country(origin) == d:
+                dispatcher.utter_message(text="Origin and destination cannot be the same. Please choose a different destination.")
+                return {"destination": None}
+            return {"destination": d}
+
+        dispatcher.utter_message(
+            text=f"Sorry, '{value}' is not supported.\nChoose destination from:\n{format_country_list()}"
+        )
+        return {"destination": None}
+
+    # Contact & booking-level fields
+    def validate_phone_number(self, value, dispatcher, tracker, domain):
+        if value and (re.fullmatch(r"\+?[1-9]\d{7,14}", value) or re.fullmatch(r"[0-9\-+ ]{7,15}", value)):
+            return {"phone_number": value}
+        dispatcher.utter_message(text="Please enter a valid phone number (e.g., +15551234567).")
+        return {"phone_number": None}
+
+    def validate_class_selection(self, value, dispatcher, tracker, domain):
+        v = (value or "").lower().strip()
+        if v in {"economy", "business", "first"}:
+            return {"class_selection": v}
+        dispatcher.utter_message(text="Please choose a class: economy, business, or first.")
+        return {"class_selection": None}
+
+    def validate_travel_date(self, value, dispatcher, tracker, domain):
+        pattern = r"^\d{2}/\d{2}/\d{4}$"
+        if not re.match(pattern, value or ""):
+            dispatcher.utter_message(text="❌ Please enter the date in DD/MM/YYYY format (e.g., 15/09/2025).")
+            return {"travel_date": None}
+
+        try:
+            dt = datetime.strptime(value, "%d/%m/%Y").date()
+        except ValueError:
+            dispatcher.utter_message(text="❌ Invalid date. Please check the day, month, and year.")
+            return {"travel_date": None}
+
+        today = datetime.utcnow().date()
+        if dt <= today:
+            dispatcher.utter_message(text="⚠️ Same-day/past travel is not available. Please choose a future date.")
+            return {"travel_date": None}
+
+        origin = tracker.get_slot("origin")
+        destination = tracker.get_slot("destination")
+
+        # If route known, check DB now and decide next steps
+        if origin and destination:
+            rows = _query_flights_for_date(origin, destination, value)
+
+            if not rows:
+                # ❌ No flights → apologize + offer to change date or destination
+                dispatcher.utter_message(
+                    text=f"Sorry, no flights are available for {origin} → {destination} on {value}. Please choose another date or destination. Thank you.",
+                    buttons=[
+                        {"title": "Change date", "payload": "date"},
+                        {"title": "Change destination", "payload": "destination"},
+                    ],
+                )
+                # Ask a temporary choice, then steer the form based on the reply
+                return {
+                    "travel_date": None,
+                    "flight_name": None,
+                    "flight_schedule_time": None,
+                    "change_choice": None,
+                    "requested_slot": "change_choice",
+                }
+
+            # ✅ Flights exist → show options as buttons
+            self._show_available_flights(origin, destination, value, dispatcher)
+
+        return {"travel_date": value}
+
+    def validate_change_choice(self, value, dispatcher, tracker, domain):
+        """Temporary slot to decide how to recover when no flights are found."""
+        v = (value or "").strip().lower()
+        if "date" in v:
+            dispatcher.utter_message(text="Okay, let's pick a different date. What date would you like to travel? (DD/MM/YYYY)")
+            return {
+                "change_choice": None,
+                "travel_date": None,
+                "flight_name": None,
+                "flight_schedule_time": None,
+                "requested_slot": "travel_date",
+            }
+        if "destination" in v:
+            dispatcher.utter_message(text="No problem. Where would you like to go instead?")
+            return {
+                "change_choice": None,
+                "destination": None,
+                "flight_name": None,
+                "flight_schedule_time": None,
+                "requested_slot": "destination",
+            }
+
+        dispatcher.utter_message(text="Please choose *date* or *destination*.")
+        return {"change_choice": None}
+
+    @staticmethod
+    def _show_available_flights(origin: str, destination: str, travel_date: str,
+                                dispatcher: CollectingDispatcher) -> None:
+        """Query DB and show flights as buttons (uses CITY_TO_IATA mapping)."""
+        rows = _query_flights_for_date(origin, destination, travel_date)
+
+        if not rows:
+            # Normally handled earlier; keep friendly fallback
+            dispatcher.utter_message(
+                text=f"No flights found for {_city_to_iata(origin)} → {_city_to_iata(destination)} on {travel_date}."
+            )
+            return
+
+        buttons = []
+        for flight_name, dep_time, arr_time in rows:
+            title = f"{flight_name} | Dep: {dep_time} → Arr: {arr_time}"
+            payload_entities = {
+                "flight_name": str(flight_name),
+                "flight_schedule_time": str(dep_time)  # match domain slot/entity name
+            }
+            payload = f"/choose_flight{json.dumps(payload_entities, ensure_ascii=False)}"
+            buttons.append({"title": title, "payload": payload})
+
+        dispatcher.utter_message(
+            text=f"Here are the available flights for {origin.title()} → {destination.title()} on {travel_date}:",
+            buttons=buttons,
+        )
+
+    def validate_return_date(self, value, dispatcher, tracker, domain):
+        pattern = r"^\d{2}/\d{2}/\d{4}$"
+        if not re.match(pattern, value or ""):
+            dispatcher.utter_message(text="❌ Please enter the date in DD/MM/YYYY format (e.g., 15/09/2025).")
+            return {"return_date": None}
+        try:
+            dep = tracker.get_slot("travel_date")
+            dep_dt = datetime.strptime(dep, "%d/%m/%Y").date() if dep else None
+            ret_dt = datetime.strptime(value, "%d/%m/%Y").date()
+        except ValueError:
+            dispatcher.utter_message(text="❌ Invalid date. Please check the day, month, and year.")
+            return {"return_date": None}
+        today = datetime.utcnow().date()
+        if ret_dt < today:
+            dispatcher.utter_message(text="❌ Return date cannot be in the past. Please choose a future date.")
+            return {"return_date": None}
+        if dep_dt and ret_dt < dep_dt:
+            dispatcher.utter_message(text="❌ Return date cannot be before the travel date. Please choose a valid return date.")
+            return {"return_date": None}
+        return {"return_date": value}
+
+    def validate_passenger_name(self, value, dispatcher, tracker, domain):
+        if value and value.strip():
+            return {"passenger_name": value.strip()}
+        dispatcher.utter_message(text="Please enter the main passenger's name.")
+        return {"passenger_name": None}
+
+    def validate_travel_count(self, value, dispatcher, tracker, domain):
+        if value and str(value).strip().isdigit():
+            n = int(str(value).strip())
+            if n >= 1:
+                return {
+                    "travel_count": n,
+                    "expected_passengers": n,
+                    "current_passenger_index": 1,
+                    "passengers": json.dumps([]),
+                    "current_passenger_name": None,
+                    "current_passenger_phone": None,
+                    "current_passenger_email": None,
+                    "current_passenger_seat_preference": None,
+                }
+        dispatcher.utter_message(text="Please enter a valid number of travelers (e.g., 1, 2, 3).")
+        return {"travel_count": None}
+
+    # Per-passenger fields (loop)
+    def validate_current_passenger_name(self, value, dispatcher, tracker, domain):
+        if value and value.strip():
+            return {"current_passenger_name": value.strip()}
+        idx = tracker.get_slot("current_passenger_index") or 1
+        dispatcher.utter_message(text=f"Please enter passenger {idx}'s full name.")
+        return {"current_passenger_name": None}
+
+    def validate_current_passenger_phone(self, value, dispatcher, tracker, domain):
+        if value and (re.fullmatch(r"\+?[1-9]\d{7,14}", value) or re.fullmatch(r"[0-9\-+ ]{7,15}", value)):
+            return {"current_passenger_phone": value}
+        idx = tracker.get_slot("current_passenger_index") or 1
+        dispatcher.utter_message(text=f"Please enter a valid phone number for passenger {idx} (e.g., +15551234567).")
+        return {"current_passenger_phone": None}
+
+    def validate_current_passenger_email(self, value, dispatcher, tracker, domain):
+        if value and re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value.strip()):
+            return {"current_passenger_email": value.strip()}
+        idx = tracker.get_slot("current_passenger_index") or 1
+        dispatcher.utter_message(text=f"Please enter a valid email for passenger {idx} (e.g., name@example.com).")
+        return {"current_passenger_email": None}
+
+    def validate_current_passenger_seat_preference(self, value, dispatcher, tracker, domain):
+        v = (value or "").lower().strip()
+        if v in {"window", "aisle", "middle"}:
+            # Collect all current passenger fields
+            name  = tracker.get_slot("current_passenger_name")
+            phone = tracker.get_slot("current_passenger_phone")
+            email = tracker.get_slot("current_passenger_email")
+            idx   = int(tracker.get_slot("current_passenger_index") or 1)
+            expected = int(tracker.get_slot("expected_passengers") or 1)
+
+            # Load current list
+            passengers_json = tracker.get_slot("passengers") or "[]"
+            try:
+                passengers: List[Dict[str, str]] = json.loads(passengers_json)
+            except Exception:
+                passengers = []
+
+            # Append this passenger (all 4 fields present now)
+            if all([name, phone, email, v]):
+                passengers.append({"name": name, "phone": phone, "email": email, "seat": v})
+
+            # Advance or finish
+            if idx < expected:
+                next_idx = idx + 1
+                dispatcher.utter_message(text=f"Got it ✅. Now, please provide details for passenger {next_idx}.")
+                return {
+                    "passengers": json.dumps(passengers),
+                    "current_passenger_index": next_idx,
+                    # clear fields for the next passenger
+                    "current_passenger_name": None,
+                    "current_passenger_phone": None,
+                    "current_passenger_email": None,
+                    "current_passenger_seat_preference": None,
+                }
+
+            # Done collecting; keep seat set so the form can complete
+            return {
+                "passengers": json.dumps(passengers),
+                "current_passenger_seat_preference": v,
+            }
+
+        idx = tracker.get_slot("current_passenger_index") or 1
+        dispatcher.utter_message(text=f"Please choose seat for passenger {idx}: window, aisle, or middle.")
+        return {"current_passenger_seat_preference": None}
+
+
+# --- SUBMIT BOOKING (saves passengers with seat) ---
+
+class ActionBookFlight(Action):
+    def name(self) -> Text:
+        return "action_book_flight"
+
+    def run(self, dispatcher: CollectingDispatcher, tracker: Tracker, domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
+        dispatcher.utter_message(text="Booking your flight now!")
+        return []
+
+
+# =========================
+# LOOKUP HELPERS & ACTIONS
+# =========================
+class ActionAskLookup(Action):
+    """Prompts the user for a booking id or phone number."""
+    def name(self) -> Text:
+        return "action_ask_lookup"
+
+    def run(self, dispatcher: CollectingDispatcher, tracker: Tracker, domain: Dict[Text, Any]) -> List[Dict]:
+        dispatcher.utter_message(text="Please share your booking ID or the phone number used for the booking.")
+        return []
+
+def _get_table_columns(conn: sqlite3.Connection, table: str) -> List[str]:
+    cur = conn.cursor()
+    cur.execute(f"PRAGMA table_info({table})")
+    return [row[1] for row in cur.fetchall()]
+
+def _row_to_dict(row: tuple, cols: List[str]) -> Dict[str, Any]:
+    return {col: row[i] for i, col in enumerate(cols)}
+
+class ActionLookupBooking(Action):
+    """Looks up a booking by booking ID (int) or phone number (partial match)."""
+    def name(self) -> Text:
+        return "action_lookup_booking"
+
+    def run(self, dispatcher: CollectingDispatcher, tracker: Tracker, domain: Dict[Text, Any]) -> List[Dict]:
+        query = (tracker.latest_message.get("text") or "").strip()
+        if not query:
+            dispatcher.utter_message(text="Please provide a booking ID or phone number.")
+            return []
+
+        try:
+            conn = sqlite3.connect(DB_PATH)
+        except Exception as e:
+            dispatcher.utter_message(text=f"⚠️ Could not open database: {e}")
+            return []
+
+        try:
+            bcols = _get_table_columns(conn, "bookings")
+            pcols = _get_table_columns(conn, "passengers")
+            cur = conn.cursor()
+
+            # Try booking id
+            booking_row = None
+            try:
+                bid = int(query)
+                if "id" in bcols:
+                    cur.execute(f"SELECT {', '.join(bcols)} FROM bookings WHERE id = ?", (bid,))
+                    row = cur.fetchone()
+                    if row:
+                        booking_row = _row_to_dict(row, bcols)
+            except Exception:
+                pass
+
+            # Fallback: phone partial match
+            if not booking_row and "phone_number" in bcols:
+                cur.execute(
+                    f"SELECT {', '.join(bcols)} FROM bookings WHERE phone_number LIKE ?",
+                    (f"%{query}%",)
+                )
+                row = cur.fetchone()
+                if row:
+                    booking_row = _row_to_dict(row, bcols)
+
+            if not booking_row:
+                dispatcher.utter_message(text="Sorry, I couldn't find a booking with that information.")
+                return []
+
+            # Fetch passengers
+            pax_lines = "   (no additional passengers)"
+            if "id" in booking_row:
+                cols_to_select = [c for c in ["name", "phone", "email", "seat_preference"] if c in pcols]
+                if cols_to_select:
+                    cur.execute(
+                        f"SELECT {', '.join(cols_to_select)} FROM passengers WHERE booking_id = ?",
+                        (booking_row["id"],)
+                    )
+                    fetched = cur.fetchall()
+                    if fetched:
+                        idx = {c: i for i, c in enumerate(cols_to_select)}
+                        lines = []
+                        for r in fetched:
+                            name  = r[idx["name"]]  if "name"  in idx else "N/A"
+                            phone = r[idx["phone"]] if "phone" in idx else "N/A"
+                            email = r[idx["email"]] if "email" in idx else "N/A"
+                            seat  = r[idx["seat_preference"]] if "seat_preference" in idx else "(no seat)"
+                            lines.append(f"   - {name} | {phone} | {email} | Seat: {seat}")
+                        pax_lines = "\n".join(lines)
+
+            g = lambda k, d="N/A": booking_row.get(k, d)
+
+            msg = (
+                f"🔎 Booking #{g('id')}\n"
+                f"📍 {g('origin')} → {g('destination')}\n"
+                f"📅 Dates: {g('travel_date')} → {g('return_date', 'N/A')}\n"
+                f"🎫 Class: {g('class_selection')}\n"
+                f"👤 Primary: {g('passenger_name')} ({g('phone_number')})\n"
+                f"👥 Travelers: {g('travel_count', 1)}\n"
+                f"🪑 Seat (global): {g('seat_preference', 'N/A')}\n"
+                f"📜 Passengers:\n{pax_lines}"
+            )
+            dispatcher.utter_message(text=msg)
+            return []
+        except Exception as e:
+            dispatcher.utter_message(text=f"⚠️ Lookup failed: {e}")
+            return []
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+class ActionSubmitBooking(Action):
+    def name(self) -> str:
+        return "action_submit_booking"
+
+    def run(self, dispatcher, tracker, domain):
+        # Trip & primary contact
+        row = {
+            "origin": tracker.get_slot("origin") or "N/A",
+            "destination": tracker.get_slot("destination") or "N/A",
+            "travel_date": tracker.get_slot("travel_date") or "N/A",
+            "return_date": tracker.get_slot("return_date") or "N/A",
+            "flight_name": tracker.get_slot("flight_name") or "N/A",
+            "flight_schedule_time": tracker.get_slot("flight_schedule_time") or "N/A",
+            # Global seat (legacy). You can remove this slot from the form; kept for compatibility.
+            "seat_preference": tracker.get_slot("seat_preference") or "N/A",
+            "class_selection": tracker.get_slot("class_selection") or "N/A",
+            "passenger_name": tracker.get_slot("passenger_name") or "N/A",  # primary contact
+            "phone_number": tracker.get_slot("phone_number") or "N/A",      # primary contact
+            "travel_count": tracker.get_slot("travel_count") or 1,
+        }
+
+        # Parse passengers list
+        passengers_json = tracker.get_slot("passengers") or "[]"
+        try:
+            passengers = json.loads(passengers_json)
+        except Exception:
+            passengers = []
+
+        # Save
+        try:
+            booking_id = _save_booking(row)
+            _save_passengers(booking_id, passengers)
+            saved_msg = f"💾 Booking #{booking_id} saved with {len(passengers)} passenger(s)."
+        except Exception as e:
+            saved_msg = f"⚠️ Could not save booking to database: {e}"
+
+        # Pretty list (with seat per passenger)
+        pax_lines = "\n".join(
+            [
+                f"   {i+1}. {p.get('name','N/A')} | {p.get('phone','N/A')} | {p.get('email','N/A')} | Seat: {p.get('seat','N/A')}"
+                for i, p in enumerate(passengers)
+            ]
+        ) or "   (no additional passengers)"
+
+        dispatcher.utter_message(
+            text=(
+                f"✅ Booking Confirmed!\n\n"
+                f"📍 From → To: {row['origin']} → {row['destination']}\n"
+                f"📅 Date: {row['travel_date']} → {row['return_date']}\n"
+                f"🛫 Flight: {row['flight_name']} at {row['flight_schedule_time']}\n"
+                f"🎫 Class: {row['class_selection']}\n"
+                f"👤 Primary Contact: {row['passenger_name']} ({row['phone_number']})\n"
+                f"👥 Travelers: {row['travel_count']}\n"
+                f"🪑 Seats: per passenger below\n"
+                f"📜 Passenger List:\n{pax_lines}\n\n"
+                f"{saved_msg}"
+            )
+        )
+
+        # Clear all slots
+        return [
+            SlotSet("origin", None),
+            SlotSet("destination", None),
+            SlotSet("travel_date", None),
+            SlotSet("return_date", None),
+            SlotSet("flight_name", None),
+            SlotSet("flight_schedule_time", None),
+            SlotSet("seat_preference", None),
+            SlotSet("class_selection", None),
+            SlotSet("passenger_name", None),
+            SlotSet("phone_number", None),
+            SlotSet("travel_count", None),
+            SlotSet("expected_passengers", None),
+            SlotSet("current_passenger_index", None),
+            SlotSet("current_passenger_name", None),
+            SlotSet("current_passenger_phone", None),
+            SlotSet("current_passenger_email", None),
+            SlotSet("current_passenger_seat_preference", None),
+            SlotSet("passengers", None),
+            SlotSet("change_choice", None),
+        ]
+
+
+class ActionCache(Action):
+    def name(self) -> str:
+        return "action_cache"
+
+    def run(self, dispatcher: CollectingDispatcher, tracker: Tracker, domain: dict) -> list:
+        dispatcher.utter_message(json_message={"clear_chat": True})
+        return [Restarted(), FollowupAction(name="utter_greet")]
+

@@ -1,0 +1,32 @@
+[
+  {
+    "text": "I'll take EK431 leaving at 01:55",
+    "entities": [
+      {
+        "start": 10,
+        "end": 15,
+        "value": "EK431",
+        "entity": "flight_name"
+      },
+      {
+        "start": 27,
+        "end": 32,
+        "value": "01:55",
+        "entity": "flight_schedule_time"
+      }
+    ],
+    "predicted_entities": []
+  },
+  {
+    "text": "Select EK431",
+    "entities": [
+      {
+        "start": 7,
+        "end": 12,
+        "value": "EK431",
+        "entity": "flight_name"
+      }
+    ],
+    "predicted_entities": []
+  }
+]
